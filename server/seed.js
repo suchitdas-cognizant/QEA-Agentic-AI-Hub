@@ -16,14 +16,19 @@ async function run() {
   await connectDB(uri);
 
   // --- Admin account ---
+  const isProd = process.env.NODE_ENV === 'production';
   const username = process.env.ADMIN_USERNAME || 'admin';
   const password = process.env.ADMIN_PASSWORD || 'admin123';
+  if (isProd && (!process.env.ADMIN_PASSWORD || password.length < 8)) {
+    console.error('✗ Set a strong ADMIN_PASSWORD (>= 8 chars) before seeding in production.');
+    process.exit(1);
+  }
   const existing = await Admin.findOne({ username });
   if (existing) {
-    console.log(`• Admin "${username}" already exists — leaving it untouched.`);
+    console.log(`• Admin "${username}" already exists — leaving it untouched (use "npm run set-admin" to change the password).`);
   } else {
     await Admin.create({ username, passwordHash: await Admin.hashPassword(password) });
-    console.log(`✓ Created admin "${username}" (password: "${password}")`);
+    console.log(`✓ Created admin "${username}". Use "npm run set-admin" to change the password later.`);
   }
 
   // --- Sample agents (only if the collection is empty) ---

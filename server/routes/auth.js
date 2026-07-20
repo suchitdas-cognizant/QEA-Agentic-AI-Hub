@@ -11,9 +11,11 @@ const VALID_ROLES = ['user', 'admin'];
 
 const normalizeLogin = (value = '') => value.trim().toLowerCase();
 
-// Directory accounts are plain "user" logins. Associate privileges come from
-// an Associate grant (see routes/access.js), applied below at login time.
+// Built-in demo logins. These are a convenience for local demos ONLY and are
+// DISABLED unless ENABLE_DEMO_LOGINS=true, so they can never be a backdoor in a
+// hosted deployment. Real users self-register; the admin lives in the database.
 function localDirectoryAccounts() {
+  if (process.env.ENABLE_DEMO_LOGINS !== 'true') return [];
   return [
     {
       username: process.env.USER_USERNAME || 'user@cognizant.com',
