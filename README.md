@@ -114,8 +114,6 @@ Key variables in `server/.env`:
 | `MONGODB_URI`    | MongoDB connection string                          | `mongodb://localhost:27017/cognizant_agents` |
 | `PORT`           | API port                                           | `5000`                                     |
 | `JWT_SECRET`     | Secret for signing admin tokens (**change this!**) | dev value                                  |
-| `ADMIN_USERNAME` | Default admin login created by the seed            | `admin`                                    |
-| `ADMIN_PASSWORD` | Default admin password                             | `admin123`                                 |
 | `QUERIES_EMAIL`  | Email shown in the footer for queries              | `agent-dashboard-queries@cognizant.com`    |
 | `CLIENT_ORIGIN`  | Allowed CORS origin (Vite dev server)              | `http://localhost:5173`                    |
 
