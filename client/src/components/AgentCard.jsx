@@ -1,5 +1,14 @@
+const AUTONOMY_LABEL = {
+  L1: 'Assistive',
+  L2: 'Supervised',
+  L3: 'Conditional',
+  L4: 'High autonomy',
+};
+
 export default function AgentCard({ agent, onOpen, index = 0 }) {
   const status = agent.status || 'Active';
+  const auto = agent.autonomyLevel;
+  const tier = agent.tier || 'Free';
 
   return (
     <article
@@ -20,14 +29,28 @@ export default function AgentCard({ agent, onOpen, index = 0 }) {
         <span className="card-icon-tile" aria-hidden="true">
           {agent.icon || '🤖'}
         </span>
-        <span className={`status-badge status-${status.toLowerCase()}`}>
-          <span className="status-dot" />
-          {status}
+        <span className="card-badges">
+          <span className={`tier-badge tier-${tier.toLowerCase()}`}>
+            {tier === 'Premium' ? '★ Premium' : 'Free'}
+          </span>
+          <span className={`status-badge status-${status.toLowerCase()}`}>
+            <span className="status-dot" />
+            {status}
+          </span>
         </span>
       </div>
 
       <h3 className="card-title">{agent.name}</h3>
       <p className="card-tagline">{agent.tagline}</p>
+
+      {auto && (
+        <div className="card-meta">
+          <span className={`autonomy-chip autonomy-${auto.toLowerCase()}`} title="Autonomy level (ARA)">
+            <span className="autonomy-level">{auto}</span>
+            {AUTONOMY_LABEL[auto] || 'Autonomy'}
+          </span>
+        </div>
+      )}
 
       <div className="card-foot">
         {agent.industry ? <span className="card-industry">{agent.industry}</span> : <span />}

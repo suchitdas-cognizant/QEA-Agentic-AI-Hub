@@ -10,6 +10,7 @@ import videoRoutes from './routes/videos.js';
 import requestRoutes from './routes/requests.js';
 import assistantRoutes from './routes/assistant.js';
 import accessRoutes from './routes/access.js';
+import evaluationRoutes from './routes/evaluation.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -24,6 +25,8 @@ app.get('/api/config', (_req, res) => {
     stages: STAGES,
     statuses: STATUSES,
     queriesEmail: process.env.QUERIES_EMAIL || '',
+    // URL of the integrated AgentBench benchmarking app (submodule at integrations/agentbench).
+    benchmarkUrl: process.env.BENCHMARK_URL || 'http://localhost:5199',
   });
 });
 
@@ -35,6 +38,7 @@ app.use('/api/videos', videoRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/access', accessRoutes);
+app.use('/api/evaluation', evaluationRoutes);
 
 // Multer / generic error handler so failed uploads return clean JSON.
 app.use((err, _req, res, _next) => {

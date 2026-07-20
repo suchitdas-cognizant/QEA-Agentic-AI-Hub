@@ -6,3 +6,6 @@ export const STAGES = ['Prototype', 'POV', 'MVP', 'Production'];
 
 // Availability status shown as the animated badge on each agent card.
 export const STATUSES = ['Active', 'Upcoming'];
+
+// Access tier shown as a badge on each agent card.
+export const TIERS = ['Free', 'Premium'];

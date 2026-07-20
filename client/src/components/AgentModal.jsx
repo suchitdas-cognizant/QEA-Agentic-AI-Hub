@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react';
 import { api, videoUrl } from '../api.js';
 
-// Convert common video URLs into an embeddable form (YouTube / Vimeo).
+// Convert well-known video URLs into an embeddable form. Returns null when the
+// link can't be safely iframed (most sites block it via X-Frame-Options) — the
+// caller then shows a "watch in a new tab" link instead.
 function toEmbed(url) {
   try {
     const u = new URL(url);
-    if (u.hostname.includes('youtube.com')) {
+    const host = u.hostname.replace(/^www\./, '');
+    if (host === 'youtube.com' || host === 'm.youtube.com') {
       const id = u.searchParams.get('v');
-      return id ? `https://www.youtube.com/embed/${id}` : url;
+      return id ? `https://www.youtube.com/embed/${id}` : null;
     }
-    if (u.hostname === 'youtu.be') {
-      return `https://www.youtube.com/embed${u.pathname}`;
-    }
-    return url;
+    if (host === 'youtu.be') return `https://www.youtube.com/embed${u.pathname}`;
+    if (host === 'vimeo.com') return `https://player.vimeo.com/video${u.pathname}`;
+    return null;
   } catch {
-    return url;
+    return null;
   }
 }
 
@@ -27,14 +29,29 @@ function VideoPlayer({ agent }) {
     );
   }
   if (agent.externalVideoUrl) {
+    const embed = toEmbed(agent.externalVideoUrl);
+    if (embed) {
+      return (
+        <div className="video-wrap">
+          <iframe
+            src={embed}
+            title={`${agent.name} demo`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      );
+    }
+    // Not embeddable — offer a redirect to the hosted video.
     return (
       <div className="video-wrap">
-        <iframe
-          src={toEmbed(agent.externalVideoUrl)}
-          title={`${agent.name} demo`}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
+        <a className="video-link-card" href={agent.externalVideoUrl} target="_blank" rel="noopener noreferrer">
+          <span className="video-link-play">▶</span>
+          <span>
+            Watch the demo video
+            <small>Opens {(() => { try { return new URL(agent.externalVideoUrl).hostname.replace(/^www\./, ''); } catch { return 'the link'; } })()} in a new tab ↗</small>
+          </span>
+        </a>
       </div>
     );
   }
@@ -135,6 +152,9 @@ export default function AgentModal({ agent, onClose, onRated }) {
         <p className="drawer-brand">Cognizant</p>
         <h2>{agent.name}</h2>
         <div className="drawer-meta">
+          <span className={`tier-badge tier-${(agent.tier || 'Free').toLowerCase()}`}>
+            {agent.tier === 'Premium' ? '★ Premium' : 'Free'}
+          </span>
           <span className={`status-badge status-${(agent.status || 'Active').toLowerCase()}`}>
             <span className="status-dot" />
             {agent.status || 'Active'}
@@ -192,16 +212,23 @@ export default function AgentModal({ agent, onClose, onRated }) {
           </>
         )}
 
-        {agent.smeEmail && (
+        {(agent.smeEmail || agent.repoUrl) && (
           <div className="drawer-actions">
-            <a
-              className="btn btn-primary"
-              href={`mailto:${agent.smeEmail}?subject=${encodeURIComponent(
-                `Connect SME — ${agent.name}`
-              )}`}
-            >
-              ✉ Connect SME
-            </a>
+            {agent.smeEmail && (
+              <a
+                className="btn btn-primary"
+                href={`mailto:${agent.smeEmail}?subject=${encodeURIComponent(
+                  `Connect SME — ${agent.name}`
+                )}`}
+              >
+                ✉ Connect SME
+              </a>
+            )}
+            {agent.repoUrl && (
+              <a className="btn btn-ghost" href={agent.repoUrl} target="_blank" rel="noopener noreferrer">
+                ⧉ View repository
+              </a>
+            )}
           </div>
         )}
 

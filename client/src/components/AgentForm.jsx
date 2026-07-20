@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api.js';
-import { STATUSES } from '../constants.js';
+import { STATUSES, TIERS } from '../constants.js';
 
 function initialState(agent) {
   return {
@@ -12,12 +12,15 @@ function initialState(agent) {
       description: b.description || '',
     })),
     status: agent?.status || 'Active',
+    tier: agent?.tier || 'Free',
+    autonomyLevel: agent?.autonomyLevel || '',
     priority: agent?.priority ?? 0,
     industry: agent?.industry || '',
     techStacks: (agent?.techStacks || []).join(', '),
     smeEmail: agent?.smeEmail || '',
     icon: agent?.icon || '🤖',
     externalVideoUrl: agent?.externalVideoUrl || '',
+    repoUrl: agent?.repoUrl || '',
   };
 }
 
@@ -133,6 +136,15 @@ export default function AgentForm({ agent = null, onSaved, onCancel }) {
           </select>
         </div>
         <div className="field">
+          <label>Access tier</label>
+          <select className="input" value={form.tier} onChange={update('tier')}>
+            {TIERS.map((t) => <option key={t}>{t}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="form-row">
+        <div className="field">
           <label>Priority (higher shows first)</label>
           <input
             className="input"
@@ -140,6 +152,16 @@ export default function AgentForm({ agent = null, onSaved, onCancel }) {
             value={form.priority}
             onChange={update('priority')}
           />
+        </div>
+        <div className="field">
+          <label>Autonomy level</label>
+          <select className="input" value={form.autonomyLevel} onChange={update('autonomyLevel')}>
+            <option value="">Not assessed</option>
+            <option value="L1">L1 — Assistive (human-driven)</option>
+            <option value="L2">L2 — Supervised (human approves actions)</option>
+            <option value="L3">L3 — Conditional (acts, human on exceptions)</option>
+            <option value="L4">L4 — High (autonomous within bounds)</option>
+          </select>
         </div>
       </div>
 
@@ -191,6 +213,16 @@ export default function AgentForm({ agent = null, onSaved, onCancel }) {
           value={form.externalVideoUrl}
           onChange={update('externalVideoUrl')}
           placeholder="https://www.youtube.com/watch?v=…"
+        />
+      </div>
+
+      <div className="field">
+        <label>Repository URL (optional)</label>
+        <input
+          className="input"
+          value={form.repoUrl}
+          onChange={update('repoUrl')}
+          placeholder="https://github.com/…"
         />
       </div>
 

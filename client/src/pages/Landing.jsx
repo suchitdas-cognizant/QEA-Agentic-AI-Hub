@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { CATEGORY_CODES } from '../constants.js';
 import CognizantLogo from '../components/CognizantLogo.jsx';
 
 /* Reveal-on-scroll: adds `.in` to any element with `data-reveal` once it
@@ -104,6 +103,7 @@ const FUTURE = [
 export default function Landing() {
   const { isAuthed, logout } = useAuth();
   const [count, setCount] = useState(null);
+  const [activeCount, setActiveCount] = useState(null);
   const [scrolled, setScrolled] = useState(false);
   const heroRef = useRef(null);
   useScrollReveal();
@@ -115,7 +115,10 @@ export default function Landing() {
   }, [isAuthed, logout]);
 
   useEffect(() => {
-    api.listAgents().then((a) => setCount(a.length)).catch(() => {});
+    api.listAgents().then((a) => {
+      setCount(a.length);
+      setActiveCount(a.filter((x) => (x.status || 'Active') === 'Active').length);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -188,8 +191,8 @@ export default function Landing() {
               <span>Agents live</span>
             </div>
             <div className="lp-stat">
-              <b>{CATEGORY_CODES.length}</b>
-              <span>Asset types</span>
+              <b>{activeCount === null ? '—' : activeCount}</b>
+              <span>Active agents</span>
             </div>
             <div className="lp-stat">
               <b>100%</b>

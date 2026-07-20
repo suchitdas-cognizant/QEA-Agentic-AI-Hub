@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { CATEGORY_CODES } from '../constants.js';
 import AgentGrid from '../components/AgentGrid.jsx';
 import RequestForm from '../components/RequestForm.jsx';
 import BrandMark from '../components/BrandMark.jsx';
@@ -21,10 +20,14 @@ export default function Hub() {
   const [view, setView] = useState('dashboard');
   const [navOpen, setNavOpen] = useState(false);
   const [agentCount, setAgentCount] = useState(null);
+  const [activeCount, setActiveCount] = useState(null);
   const [queriesEmail, setQueriesEmail] = useState('');
 
   useEffect(() => {
-    api.listAgents().then((a) => setAgentCount(a.length)).catch(() => {});
+    api.listAgents().then((a) => {
+      setAgentCount(a.length);
+      setActiveCount(a.filter((x) => (x.status || 'Active') === 'Active').length);
+    }).catch(() => {});
     api.getConfig().then((c) => setQueriesEmail(c.queriesEmail)).catch(() => {});
   }, []);
 
@@ -114,6 +117,7 @@ export default function Hub() {
               <Dashboard
                 name={user?.displayName || user?.username}
                 agentCount={agentCount}
+                activeCount={activeCount}
                 onGo={go}
               />
               {role === 'user' && <RequestAccessCard />}
@@ -314,7 +318,7 @@ function RequestsInbox({ canDelete }) {
   );
 }
 
-function Dashboard({ name, agentCount, onGo }) {
+function Dashboard({ name, agentCount, activeCount, onGo }) {
   return (
     <div className="hub-dash">
       <div className="hub-welcome">
@@ -328,8 +332,8 @@ function Dashboard({ name, agentCount, onGo }) {
           <span>Agents available</span>
         </button>
         <div className="hub-stat">
-          <b>{CATEGORY_CODES.length}</b>
-          <span>Asset types</span>
+          <b>{activeCount === null ? '—' : activeCount}</b>
+          <span>Active agents</span>
         </div>
         <div className="hub-stat">
           <b>24/7</b>

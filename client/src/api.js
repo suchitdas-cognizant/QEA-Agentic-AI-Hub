@@ -77,7 +77,10 @@ export const api = {
   listRequests: () => request('/requests', { auth: true }),
   updateRequestStatus: (id, status) =>
     request(`/requests/${id}`, { method: 'PATCH', body: { status }, auth: true }),
-  publishRequest: (id) => request(`/requests/${id}/publish`, { method: 'POST', auth: true }),
+  publishRequest: (id, status = 'Active', tier = 'Free') =>
+    request(`/requests/${id}/publish`, { method: 'POST', body: { status, tier }, auth: true }),
+  evaluateRequest: (id) =>
+    request('/evaluation/run', { method: 'POST', body: { requestId: id }, auth: true }),
   deleteRequest: (id) => request(`/requests/${id}`, { method: 'DELETE', auth: true }),
 
   // access / associate management

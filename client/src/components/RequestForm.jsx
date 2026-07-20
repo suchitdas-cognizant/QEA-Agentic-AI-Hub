@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const EMPTY = { agentName: '', useCase: '', description: '', repoUrl: '' };
+const EMPTY = {
+  agentName: '', useCase: '', description: '', repoUrl: '', externalVideoUrl: '',
+  industry: '', techStacks: '', smeEmail: '', icon: '', tier: 'Free',
+};
 
 // Per-file size limits (MB). Kept below the server's 200 MB cap so the browser
 // never resets mid-upload — instead we show a clear message before sending.
@@ -66,6 +69,12 @@ export default function RequestForm() {
       fd.append('description', form.description);
       if (!isIdea) {
         fd.append('repoUrl', form.repoUrl);
+        fd.append('externalVideoUrl', form.externalVideoUrl);
+        fd.append('industry', form.industry);
+        fd.append('techStacks', form.techStacks);
+        fd.append('smeEmail', form.smeEmail);
+        fd.append('icon', form.icon);
+        fd.append('tier', form.tier);
         fd.append('keyBenefits', JSON.stringify(benefits.filter((b) => b.title || b.description)));
         files.md.forEach((f) => fd.append('md', f));
         files.video.slice(0, 1).forEach((f) => fd.append('video', f));
@@ -168,6 +177,61 @@ export default function RequestForm() {
             </div>
           </div>
 
+          <div className="form-row">
+            <div className="field">
+              <label>Industry (optional)</label>
+              <input
+                className="input"
+                value={form.industry}
+                onChange={update('industry')}
+                placeholder="e.g. Insurance, Retail, Healthcare"
+              />
+            </div>
+            <div className="field">
+              <label>Icon (emoji, optional)</label>
+              <input
+                className="input"
+                value={form.icon}
+                onChange={update('icon')}
+                maxLength={4}
+                placeholder="🤖"
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="field">
+              <label>Tech stacks (optional)</label>
+              <input
+                className="input"
+                value={form.techStacks}
+                onChange={update('techStacks')}
+                placeholder="GenAI, Python, React (comma separated)"
+              />
+              <small className="sub">Separate technologies with commas.</small>
+            </div>
+            <div className="field">
+              <label>Access tier</label>
+              <select className="input" value={form.tier} onChange={update('tier')}>
+                <option value="Free">Free</option>
+                <option value="Premium">Premium</option>
+              </select>
+              <small className="sub">Admin confirms this at approval.</small>
+            </div>
+          </div>
+
+          <div className="field">
+            <label>SME email — Connect SME contact (optional)</label>
+            <input
+              className="input"
+              type="email"
+              value={form.smeEmail}
+              onChange={update('smeEmail')}
+              placeholder="name@cognizant.com"
+            />
+            <small className="sub">Shown as the “Connect SME” contact on the agent page.</small>
+          </div>
+
           <div className="field">
             <label>Documentation (.md files)</label>
             <input className="file-input" type="file" accept=".md,.markdown,text/markdown,text/plain" multiple onChange={onFiles('md')} />
@@ -177,7 +241,18 @@ export default function RequestForm() {
           <div className="field">
             <label>Demo video</label>
             <input className="file-input" type="file" accept="video/*" onChange={onFiles('video')} />
-            <small className="sub">Max {LIMITS.video.max} MB. For a larger video, add a repository or hosting link below.</small>
+            <small className="sub">Max {LIMITS.video.max} MB. For a larger video, paste a link below instead.</small>
+          </div>
+
+          <div className="field">
+            <label>…or a demo video link (YouTube, SharePoint, etc.)</label>
+            <input
+              className="input"
+              value={form.externalVideoUrl}
+              onChange={update('externalVideoUrl')}
+              placeholder="https://www.youtube.com/watch?v=…"
+            />
+            <small className="sub">Shown on the agent page once an admin approves it. An uploaded file takes priority over this link.</small>
           </div>
 
           <div className="field">

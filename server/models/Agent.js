@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { CATEGORY_CODES, STAGES, STATUSES } from '../constants.js';
+import { CATEGORY_CODES, STAGES, STATUSES, TIERS } from '../constants.js';
 
 // A single "Key Benefit" entry: a short heading + supporting line.
 const benefitSchema = new mongoose.Schema(
@@ -40,6 +40,10 @@ const agentSchema = new mongoose.Schema(
     stage: { type: String, enum: STAGES, default: 'Prototype' },
     // Availability status shown as the animated card badge (Active / Upcoming).
     status: { type: String, enum: STATUSES, default: 'Active' },
+    // Access tier badge on the card (Free / Premium).
+    tier: { type: String, enum: TIERS, default: 'Free' },
+    // Autonomy level (L1–L4) from the ARA readiness evaluation; '' if unassessed.
+    autonomyLevel: { type: String, default: '', trim: true },
     // Display priority — higher numbers are shown first on the dashboard.
     priority: { type: Number, default: 0 },
     // Optional grouping (e.g. "Insurance", "Retail", "HR").
@@ -50,6 +54,8 @@ const agentSchema = new mongoose.Schema(
     videoFileId: { type: mongoose.Schema.Types.ObjectId, default: null },
     // Optional external video URL (YouTube etc.) used when no file is uploaded.
     externalVideoUrl: { type: String, default: '', trim: true },
+    // Optional link to the agent's source repository (carried from the submission).
+    repoUrl: { type: String, default: '', trim: true },
     // Files (md / code / other) carried over from a published agent request.
     attachments: { type: [attachmentSchema], default: [] },
     // Email of the subject-matter expert for the "Connect SME" link.

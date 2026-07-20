@@ -1,0 +1,6 @@
+[submodule "integrations/ara"]
+	path = integrations/ara
+	url = https://github.com/ahona-bar59/agent-readiness-analyzer
+[submodule "integrations/agentbench"]
+	path = integrations/agentbench
+	url = https://github.com/mprangshu/AgentBench.git

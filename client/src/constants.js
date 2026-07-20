@@ -17,5 +17,7 @@ export const STAGES = ['Prototype', 'POV', 'MVP', 'Production'];
 
 export const STATUSES = ['Active', 'Upcoming'];
 
+export const TIERS = ['Free', 'Premium'];
+
 export const categoryMeta = (code) =>
   CATEGORY_META[code] || { label: code, bg: '#cccccc', fg: '#1b1b1b' };

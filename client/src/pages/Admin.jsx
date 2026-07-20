@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, attachmentUrl } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { STATUSES as AGENT_STATUSES, TIERS as AGENT_TIERS } from '../constants.js';
 import AgentForm from '../components/AgentForm.jsx';
 import AgentGrid from '../components/AgentGrid.jsx';
 import BrandMark from '../components/BrandMark.jsx';
@@ -90,9 +91,15 @@ const ATTACH_ICON = { video: '🎬', md: '📄', code: '💻', other: '📎' };
 const roleLabel = (role) => ({ admin: 'Admin', associate: 'Associate', user: 'User' }[role] || 'User');
 
 // Focused, read + act view for a single request.
-function RequestDetail({ req, busy, onClose, onStatus, onPublish, onDelete }) {
+function RequestDetail({ req, busy, evaluating, onClose, onStatus, onPublish, onEvaluate, onDelete }) {
+  const [launchStatus, setLaunchStatus] = useState('Active');
+  const [launchTier, setLaunchTier] = useState('Free');
+  useEffect(() => { if (req?.tier) setLaunchTier(req.tier); }, [req?._id, req?.tier]);
   if (!req) return null;
   const r = req;
+  const ev = r.evaluation;
+  const card = ev?.card || {};
+  const failedGates = (card.hard_gates || []).filter((g) => g.status !== 'PASS');
   return (
     <div className="req-modal-overlay" onClick={onClose}>
       <div className="req-modal" onClick={(e) => e.stopPropagation()}>
@@ -120,7 +127,21 @@ function RequestDetail({ req, busy, onClose, onStatus, onPublish, onDelete }) {
           </>
         )}
 
-        {(r.attachments?.length > 0 || r.repoUrl) && (
+        {(r.industry || r.techStacks?.length > 0 || r.smeEmail || r.type === 'submission') && (
+          <>
+            <div className="req-label">Agent details</div>
+            <div className="req-detail-grid">
+              {r.type === 'submission' && <div><span className="k">Tier</span>{r.tier || 'Free'}</div>}
+              {r.industry && <div><span className="k">Industry</span>{r.industry}</div>}
+              {r.smeEmail && <div><span className="k">SME</span>{r.smeEmail}</div>}
+              {r.techStacks?.length > 0 && (
+                <div><span className="k">Tech</span>{r.techStacks.join(', ')}</div>
+              )}
+            </div>
+          </>
+        )}
+
+        {(r.attachments?.length > 0 || r.repoUrl || r.externalVideoUrl) && (
           <>
             <div className="req-label">Attachments</div>
             <div className="req-attach">
@@ -135,6 +156,7 @@ function RequestDetail({ req, busy, onClose, onStatus, onPublish, onDelete }) {
                   {ATTACH_ICON[a.kind] || '📎'} {a.filename || a.kind}
                 </a>
               ))}
+              {r.externalVideoUrl && <a className="attach-chip" href={r.externalVideoUrl} target="_blank" rel="noreferrer">🎬 Video link</a>}
               {r.repoUrl && <a className="attach-chip" href={r.repoUrl} target="_blank" rel="noreferrer">🔗 Repository</a>}
             </div>
           </>
@@ -142,6 +164,112 @@ function RequestDetail({ req, busy, onClose, onStatus, onPublish, onDelete }) {
 
         {r.type === 'idea' && !r.description && !r.useCase && (
           <p className="sub">No extra detail provided — this is an innovation idea.</p>
+        )}
+
+        {/* ---- Readiness evaluation (ARA) ---- */}
+        <div className="req-label">Readiness evaluation</div>
+        {ev && card.verdict ? (
+          <div className="eval-report">
+            <div className="eval-head">
+              <div className="eval-scorebox">
+                <b>{card.total_score}</b>
+                <span>/ 10</span>
+              </div>
+              <div className="eval-head-meta">
+                <span className={`eval-verdict verdict-${card.verdict}`}>
+                  {String(card.verdict).replace(/_/g, ' ')}
+                </span>
+                {card.autonomy_level && <span className="eval-chip">Autonomy {card.autonomy_level}</span>}
+                {card.assessment_confidence && <span className="eval-chip">{card.assessment_confidence} confidence</span>}
+              </div>
+              <button className="btn btn-ghost btn-sm eval-rerun" disabled={evaluating} onClick={() => onEvaluate(r._id)}>
+                {evaluating ? 'Re-evaluating…' : '↻ Re-evaluate'}
+              </button>
+            </div>
+
+            {card.agent_summary && <p className="eval-summary">{card.agent_summary}</p>}
+
+            {card.dimensions?.length > 0 && (
+              <div className="eval-block">
+                <div className="eval-sub">Dimensions</div>
+                <div className="eval-dims">
+                  {card.dimensions.map((d, i) => {
+                    const tone = d.score >= 1.5 ? 'good' : d.score >= 0.75 ? 'mid' : 'bad';
+                    return (
+                      <div className="eval-dim" key={i}>
+                        <span className="eval-dim-name">{d.name}</span>
+                        <span className="eval-bar">
+                          <i className={`fill-${tone}`} style={{ width: `${(d.score / 2) * 100}%` }} />
+                        </span>
+                        <span className="eval-dim-score">{d.score}/2</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {failedGates.length > 0 && (
+              <div className="eval-block">
+                <div className="eval-sub">Failed hard gates</div>
+                <ul className="eval-items">
+                  {failedGates.map((g, i) => (
+                    <li key={i}>
+                      <span className={`sev sev-${g.severity}`}>{g.severity}</span>
+                      <span><b>{g.gate}</b> — {g.evidence}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {card.failure_clusters?.length > 0 && (
+              <div className="eval-block">
+                <div className="eval-sub">Failure clusters</div>
+                <ul className="eval-items">
+                  {card.failure_clusters.map((c, i) => (
+                    <li key={i}>
+                      <span className={`sev sev-${c.severity}`}>{c.severity}</span>
+                      <span>
+                        <b>{c.cluster}</b>
+                        {c.description && <> — {c.description}</>}
+                        {c.framework_source && <em className="eval-src"> ({c.framework_source})</em>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {card.recommendations?.length > 0 && (
+              <div className="eval-block">
+                <div className="eval-sub">Recommendations</div>
+                <ul className="eval-items">
+                  {card.recommendations.map((x, i) => {
+                    if (typeof x === 'string') return <li key={i}><span>{x}</span></li>;
+                    return (
+                      <li key={i}>
+                        {x.priority && <span className={`sev sev-${x.priority}`}>{x.priority}</span>}
+                        <span>
+                          {x.area && <b>{x.area}: </b>}
+                          {x.action || x.text || ''}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            <p className="eval-meta">
+              Scored from {ev.source || 'submission'} · {card.scoring_mode === 'heuristic' ? 'offline heuristic' : 'LLM judge'}
+              {ev.evaluatedAt ? ` · ${new Date(ev.evaluatedAt).toLocaleString()}` : ''}
+            </p>
+          </div>
+        ) : (
+          <button className="btn btn-primary btn-sm" disabled={evaluating} onClick={() => onEvaluate(r._id)}>
+            {evaluating ? 'Evaluating…' : '▶ Send for evaluation'}
+          </button>
         )}
 
         <div className="req-modal-actions">
@@ -156,9 +284,33 @@ function RequestDetail({ req, busy, onClose, onStatus, onPublish, onDelete }) {
           {r.publishedAgent ? (
             <span className="note ok">✓ Published as a live agent</span>
           ) : (
-            <button className="btn btn-primary btn-sm" disabled={busy === r._id} onClick={() => onPublish(r._id)}>
-              {busy === r._id ? 'Publishing…' : 'Approve & publish'}
-            </button>
+            <div className="req-publish-group">
+              <label className="req-publish-as">
+                Launch as
+                <select
+                  className="input"
+                  value={launchStatus}
+                  onChange={(e) => setLaunchStatus(e.target.value)}
+                  style={{ padding: '6px 10px', maxWidth: 130 }}
+                >
+                  {AGENT_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </label>
+              <label className="req-publish-as">
+                Tier
+                <select
+                  className="input"
+                  value={launchTier}
+                  onChange={(e) => setLaunchTier(e.target.value)}
+                  style={{ padding: '6px 10px', maxWidth: 120 }}
+                >
+                  {AGENT_TIERS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+              <button className="btn btn-primary btn-sm" disabled={busy === r._id} onClick={() => onPublish(r._id, launchStatus, launchTier)}>
+                {busy === r._id ? 'Publishing…' : 'Approve & publish'}
+              </button>
+            </div>
           )}
           <button className="btn btn-danger btn-sm" onClick={() => onDelete(r._id)}>Delete</button>
         </div>
@@ -171,6 +323,7 @@ function RequestsTab() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
+  const [evaluating, setEvaluating] = useState(false);
   const [detailId, setDetailId] = useState(null);
 
   // Deriving the open request from `rows` keeps the modal in sync after reloads.
@@ -196,16 +349,27 @@ function RequestsTab() {
     setDetailId(null);
     load();
   };
-  const publish = async (id) => {
-    if (!confirm('Approve and publish this submission as a live agent?')) return;
+  const publish = async (id, status = 'Active', tier = 'Free') => {
+    if (!confirm(`Approve and publish this submission as a live agent (${status}, ${tier})?`)) return;
     setBusy(id);
     try {
-      await api.publishRequest(id);
+      await api.publishRequest(id, status, tier);
       await load();
     } catch (e) {
       alert(e.message);
     } finally {
       setBusy(null);
+    }
+  };
+  const evaluate = async (id) => {
+    setEvaluating(true);
+    try {
+      await api.evaluateRequest(id);
+      await load();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setEvaluating(false);
     }
   };
 
@@ -239,11 +403,98 @@ function RequestsTab() {
       <RequestDetail
         req={detail}
         busy={busy}
+        evaluating={evaluating}
         onClose={() => setDetailId(null)}
         onStatus={setStatus}
         onPublish={publish}
+        onEvaluate={evaluate}
         onDelete={remove}
       />
+    </div>
+  );
+}
+
+/* ---------------- Benchmarking tab (AgentBench integration) ---------------- */
+const AGENTBENCH_REPO = 'https://github.com/mprangshu/AgentBench.git';
+
+function BenchmarkTab() {
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [reachable, setReachable] = useState(null); // null = checking, true/false
+
+  useEffect(() => {
+    let alive = true;
+    api.getConfig()
+      .then((c) => { if (alive) setUrl(c.benchmarkUrl || ''); })
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  // Probe whether the AgentBench app is actually up (no-cors ping).
+  useEffect(() => {
+    if (!url) return;
+    let alive = true;
+    setReachable(null);
+    fetch(url, { mode: 'no-cors' })
+      .then(() => { if (alive) setReachable(true); })
+      .catch(() => { if (alive) setReachable(false); });
+    return () => { alive = false; };
+  }, [url]);
+
+  const open = () => url && window.open(url, '_blank', 'noopener,noreferrer');
+
+  if (loading) return <div className="panel"><div className="loading">Loading…</div></div>;
+
+  return (
+    <div className="panel bench-panel">
+      <div className="bench-head">
+        <div>
+          <h3 style={{ margin: 0 }}>AgentBench — benchmarking</h3>
+          <p className="sub" style={{ margin: '4px 0 0' }}>
+            Run standardized benchmarks and scoring for agents. Served by the integrated
+            AgentBench app; changes your teammate pushes sync into the hub.
+          </p>
+        </div>
+        <div className="bench-actions">
+          <button className="btn btn-primary btn-sm" onClick={open} disabled={!url}>
+            ↗ Open AgentBench
+          </button>
+          <a className="btn btn-ghost btn-sm" href={AGENTBENCH_REPO} target="_blank" rel="noreferrer">
+            ⧉ Repository
+          </a>
+        </div>
+      </div>
+
+      <div className="bench-status">
+        <span className={`bench-dot ${reachable === true ? 'up' : reachable === false ? 'down' : 'wait'}`} />
+        {reachable === true && <>Service is up at <code>{url}</code></>}
+        {reachable === false && <>Not reachable at <code>{url}</code> — start the AgentBench app, then reload.</>}
+        {reachable === null && <>Checking <code>{url}</code>…</>}
+      </div>
+
+      {reachable === true ? (
+        <div className="bench-frame">
+          <iframe src={url} title="AgentBench" allow="clipboard-write" />
+        </div>
+      ) : (
+        <div className="bench-empty">
+          <div className="bench-empty-icon">📊</div>
+          <b>AgentBench isn’t running yet</b>
+          <p>
+            The benchmarking app is integrated as a submodule at <code>integrations/agentbench</code>.
+            Once it’s started it will appear here, or you can open it in a new tab.
+          </p>
+          <div className="bench-actions">
+            <button className="btn btn-primary btn-sm" onClick={open} disabled={!url}>↗ Open AgentBench</button>
+            <a className="btn btn-ghost btn-sm" href={AGENTBENCH_REPO} target="_blank" rel="noreferrer">⧉ View repository</a>
+          </div>
+          <p className="bench-hint">
+            To sync your teammate’s latest changes, run <code>sync-agents.ps1</code> — it pulls the
+            AgentBench submodule and restarts the services.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -442,6 +693,7 @@ const ADMIN_NAV = [
   { id: 'catalog', label: 'Agents', icon: '◧' },
   { id: 'manage', label: 'Manage agents', icon: '⚙' },
   { id: 'requests', label: 'Agent requests', icon: '✉' },
+  { id: 'benchmark', label: 'Benchmarking', icon: '📊' },
   { id: 'access', label: 'Access', icon: '⚑' },
 ];
 
@@ -534,6 +786,7 @@ export default function Admin() {
           {view === 'catalog' && <AgentGrid embedded />}
           {view === 'manage' && <AgentsTab />}
           {view === 'requests' && <RequestsTab />}
+          {view === 'benchmark' && <BenchmarkTab />}
           {view === 'access' && <AccessTab />}
         </div>
       </div>

@@ -23,7 +23,7 @@ function parseAgentBody(body) {
   const out = {};
   const str = (k) => (body[k] !== undefined ? String(body[k]).trim() : undefined);
 
-  for (const key of ['name', 'tagline', 'description', 'category', 'stage', 'status', 'industry', 'smeEmail', 'icon', 'externalVideoUrl']) {
+  for (const key of ['name', 'tagline', 'description', 'category', 'stage', 'status', 'tier', 'autonomyLevel', 'industry', 'smeEmail', 'icon', 'externalVideoUrl', 'repoUrl']) {
     const v = str(key);
     if (v !== undefined) out[key] = v;
   }

@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import AgentRequest from '../models/AgentRequest.js';
 import Agent from '../models/Agent.js';
+import { STATUSES, TIERS } from '../constants.js';
 import { requireAdmin, requireStaff, requireAuth } from '../middleware/auth.js';
 import { getBucket } from '../config/db.js';
 import { uploadBuffer, deleteFile, findFile } from '../utils/gridfs.js';
@@ -21,6 +22,20 @@ const FILE_FIELDS = [
   { name: 'video', maxCount: 1 },
   { name: 'code', maxCount: 10 },
 ];
+
+// Accepts a comma-separated string (or array) and returns a clean string array.
+function parseTechStacks(raw) {
+  let ts = raw;
+  if (typeof ts === 'string') {
+    try {
+      const j = JSON.parse(ts);
+      ts = Array.isArray(j) ? j : ts.split(',');
+    } catch {
+      ts = ts.split(',');
+    }
+  }
+  return (Array.isArray(ts) ? ts : []).map((s) => String(s).trim()).filter(Boolean);
+}
 
 function parseBenefits(raw) {
   let kb = raw;
@@ -76,6 +91,12 @@ router.post('/', requireAuth, upload.fields(FILE_FIELDS), async (req, res) => {
       description: String(req.body?.description || '').trim(),
       useCase: String(req.body?.useCase || '').trim(),
       repoUrl: isIdea ? '' : String(req.body?.repoUrl || '').trim(),
+      externalVideoUrl: isIdea ? '' : String(req.body?.externalVideoUrl || '').trim(),
+      industry: isIdea ? '' : String(req.body?.industry || '').trim(),
+      techStacks: isIdea ? [] : parseTechStacks(req.body?.techStacks),
+      smeEmail: isIdea ? '' : String(req.body?.smeEmail || '').trim(),
+      icon: isIdea ? '' : String(req.body?.icon || '').trim(),
+      tier: isIdea ? 'Free' : (TIERS.includes(req.body?.tier) ? req.body.tier : 'Free'),
       keyBenefits: isIdea ? [] : parseBenefits(req.body?.keyBenefits),
       attachments,
     });
@@ -85,9 +106,12 @@ router.post('/', requireAuth, upload.fields(FILE_FIELDS), async (req, res) => {
   }
 });
 
-// GET /api/requests  (staff) — list all submissions, newest first
-router.get('/', requireStaff, async (_req, res) => {
-  const requests = await AgentRequest.find().sort({ createdAt: -1 });
+// GET /api/requests  (staff) — newest first.
+//  • admin      -> everything (ideas + full agent submissions).
+//  • associate  -> only user-proposed innovation ideas, not other associates' submissions.
+router.get('/', requireStaff, async (req, res) => {
+  const filter = req.admin?.role === 'associate' ? { type: 'idea' } : {};
+  const requests = await AgentRequest.find(filter).sort({ createdAt: -1 });
   res.json(requests);
 });
 
@@ -130,12 +154,18 @@ router.get('/attachment/:id', async (req, res) => {
   bucket.openDownloadStream(fileId).pipe(res);
 });
 
-// PATCH /api/requests/:id  (staff) — update review status
+// PATCH /api/requests/:id  (staff) — update review status.
+// Associates may only touch user-proposed ideas, not associates' full submissions.
 router.patch('/:id', requireStaff, async (req, res) => {
   const { status } = req.body || {};
-  const updated = await AgentRequest.findByIdAndUpdate(req.params.id, { status }, { new: true });
-  if (!updated) return res.status(404).json({ error: 'Request not found.' });
-  res.json(updated);
+  const doc = await AgentRequest.findById(req.params.id);
+  if (!doc) return res.status(404).json({ error: 'Request not found.' });
+  if (req.admin?.role === 'associate' && doc.type !== 'idea') {
+    return res.status(403).json({ error: 'You do not have access to this request.' });
+  }
+  doc.status = status;
+  await doc.save();
+  res.json(doc);
 });
 
 // POST /api/requests/:id/publish  (admin) — turn the submission into a live agent.
@@ -146,15 +176,33 @@ router.post('/:id/publish', requireAdmin, async (req, res) => {
     return res.status(409).json({ error: 'This request has already been published.' });
   }
 
+  // Admin chooses the launch status at publish time (Active by default).
+  const status = STATUSES.includes(req.body?.status) ? req.body.status : 'Active';
+  // Access tier: admin's choice, else the associate's suggestion, else Free.
+  const tier = TIERS.includes(req.body?.tier)
+    ? req.body.tier
+    : (TIERS.includes(reqDoc.tier) ? reqDoc.tier : 'Free');
+
   const videoAtt = reqDoc.attachments.find((a) => a.kind === 'video');
+  // Carry the autonomy level detected by the ARA readiness evaluation, if run.
+  const autonomyLevel = reqDoc.evaluation?.card?.autonomy_level || '';
   const agent = await Agent.create({
     name: reqDoc.agentName,
     tagline: reqDoc.useCase,
     description: reqDoc.description,
     keyBenefits: reqDoc.keyBenefits,
+    autonomyLevel: autonomyLevel === 'UNKNOWN' ? '' : autonomyLevel,
+    industry: reqDoc.industry || '',
+    techStacks: reqDoc.techStacks || [],
+    smeEmail: reqDoc.smeEmail || '',
+    ...(reqDoc.icon ? { icon: reqDoc.icon } : {}),
+    // Prefer an uploaded video file; otherwise carry the associate's external link.
     videoFileId: videoAtt ? videoAtt.fileId : null,
+    externalVideoUrl: videoAtt ? '' : reqDoc.externalVideoUrl || '',
+    repoUrl: reqDoc.repoUrl || '',
     attachments: reqDoc.attachments.filter((a) => a.kind !== 'video'),
-    status: 'Active',
+    status,
+    tier,
   });
 
   reqDoc.status = 'Approved';
