@@ -54,6 +54,10 @@ const agentRequestSchema = new mongoose.Schema(
     },
     // Cached readiness report from the ARA evaluation service (card/reasons/guard + timestamp).
     evaluation: { type: mongoose.Schema.Types.Mixed, default: null },
+    // For innovation ideas: the associate an admin forwarded it to (to build out).
+    forwardedTo: { type: String, default: '', trim: true },
+    forwardedToName: { type: String, default: '', trim: true },
+    forwardedAt: { type: Date, default: null },
     // Set when an admin publishes the request as a live agent.
     publishedAgent: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent', default: null },
   },

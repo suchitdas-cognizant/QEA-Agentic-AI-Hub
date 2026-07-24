@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import AgentRequest from '../models/AgentRequest.js';
 import Agent from '../models/Agent.js';
+import Associate from '../models/Associate.js';
 import { STATUSES, TIERS } from '../constants.js';
 import { requireAdmin, requireStaff, requireAuth } from '../middleware/auth.js';
 import { getBucket } from '../config/db.js';
@@ -108,9 +109,13 @@ router.post('/', requireAuth, upload.fields(FILE_FIELDS), async (req, res) => {
 
 // GET /api/requests  (staff) — newest first.
 //  • admin      -> everything (ideas + full agent submissions).
-//  • associate  -> only user-proposed innovation ideas, not other associates' submissions.
+//  • associate  -> only the innovation ideas an admin has forwarded to them.
 router.get('/', requireStaff, async (req, res) => {
-  const filter = req.admin?.role === 'associate' ? { type: 'idea' } : {};
+  let filter = {};
+  if (req.admin?.role === 'associate') {
+    const email = String(req.admin.username || '').trim().toLowerCase();
+    filter = { type: 'idea', forwardedTo: email };
+  }
   const requests = await AgentRequest.find(filter).sort({ createdAt: -1 });
   res.json(requests);
 });
@@ -155,13 +160,16 @@ router.get('/attachment/:id', async (req, res) => {
 });
 
 // PATCH /api/requests/:id  (staff) — update review status.
-// Associates may only touch user-proposed ideas, not associates' full submissions.
+// Associates may only touch innovation ideas that were forwarded to them.
 router.patch('/:id', requireStaff, async (req, res) => {
   const { status } = req.body || {};
   const doc = await AgentRequest.findById(req.params.id);
   if (!doc) return res.status(404).json({ error: 'Request not found.' });
-  if (req.admin?.role === 'associate' && doc.type !== 'idea') {
-    return res.status(403).json({ error: 'You do not have access to this request.' });
+  if (req.admin?.role === 'associate') {
+    const email = String(req.admin.username || '').trim().toLowerCase();
+    if (doc.type !== 'idea' || doc.forwardedTo !== email) {
+      return res.status(403).json({ error: 'You do not have access to this request.' });
+    }
   }
   doc.status = status;
   await doc.save();
@@ -209,6 +217,26 @@ router.post('/:id/publish', requireAdmin, async (req, res) => {
   reqDoc.publishedAgent = agent._id;
   await reqDoc.save();
   res.status(201).json({ ok: true, agentId: agent._id, request: reqDoc });
+});
+
+// POST /api/requests/:id/forward  (admin) — forward an innovation idea to an
+// associate to build out. Ideas are never published directly.
+router.post('/:id/forward', requireAdmin, async (req, res) => {
+  const email = String(req.body?.associateEmail || '').trim().toLowerCase();
+  if (!email) return res.status(400).json({ error: 'Pick an associate to forward to.' });
+
+  const doc = await AgentRequest.findById(req.params.id);
+  if (!doc) return res.status(404).json({ error: 'Request not found.' });
+
+  const associate = await Associate.findOne({ email });
+  if (!associate) return res.status(404).json({ error: 'That associate no longer has access.' });
+
+  doc.forwardedTo = associate.email;
+  doc.forwardedToName = associate.name || associate.email;
+  doc.forwardedAt = new Date();
+  doc.status = 'In Review';
+  await doc.save();
+  res.json({ ok: true, request: doc });
 });
 
 // DELETE /api/requests/:id  (admin) — also remove its attachment files.

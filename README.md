@@ -75,9 +75,10 @@ It works fully offline (deterministic recommendations). For LLM-written prose,
 copy `.env.example` to `.env` and set `GEMINI_API_KEY`. If the service is down,
 the Assistant shows a friendly "couldn't reach the recommender" message.
 
-Then open **http://localhost:5173**. Admin console: **http://localhost:5173/admin**
-(login `admin` / `admin123`). You can also point **MongoDB Compass** at
-`mongodb://127.0.0.1:27017` to browse the data.
+Then open **http://localhost:5173**. Admin console: **http://localhost:5173/admin**.
+Sign in with the admin credentials you set in `server/.env` (`ADMIN_USERNAME` /
+`ADMIN_PASSWORD`) — see [docs/HOSTING.md](docs/HOSTING.md) to create or change them.
+You can also point **MongoDB Compass** at `mongodb://127.0.0.1:27017` to browse the data.
 
 > The database only needs seeding once (already done). Re-run `cd server && npm run seed`
 > only if you wipe the data folder.
@@ -113,11 +114,14 @@ Key variables in `server/.env`:
 |------------------|----------------------------------------------------|--------------------------------------------|
 | `MONGODB_URI`    | MongoDB connection string                          | `mongodb://localhost:27017/cognizant_agents` |
 | `PORT`           | API port                                           | `5000`                                     |
-| `JWT_SECRET`     | Secret for signing admin tokens (**change this!**) | dev value                                  |
-| `ADMIN_USERNAME` | Default admin login created by the seed            | `admin`                                    |
-| `ADMIN_PASSWORD` | Default admin password                             | `admin123`                                 |
+| `JWT_SECRET`     | Secret for signing tokens (**set a long random value**) | — (required)                          |
+| `ADMIN_USERNAME` | Admin login created by the seed                    | set your own                               |
+| `ADMIN_PASSWORD` | Admin password (**use a strong one**)              | set your own                               |
 | `QUERIES_EMAIL`  | Email shown in the footer for queries              | `agent-dashboard-queries@cognizant.com`    |
 | `CLIENT_ORIGIN`  | Allowed CORS origin (Vite dev server)              | `http://localhost:5173`                    |
+
+> Do not commit real credentials. `.env` is gitignored; set these values in your
+> own `.env` or on your hosting platform. See [docs/HOSTING.md](docs/HOSTING.md).
 
 Seed the database (creates the admin account + sample agents):
 
@@ -157,7 +161,7 @@ so no extra config is needed.
   to open the detail drawer (description, tech stack, demo video, star rating, Connect SME).
 - **Request form (footer)** — anyone can request a new agent; submissions are stored in
   MongoDB and appear in the admin console. The footer also shows the queries email.
-- **Admin (`/admin`)** — sign in with the seeded credentials (`admin` / `admin123`):
+- **Admin (`/admin`)** — sign in with your configured admin credentials (`ADMIN_USERNAME` / `ADMIN_PASSWORD`):
   - **Agents tab** — add / edit / delete agents and **upload demo videos** (stored in GridFS)
     or paste an external video URL (YouTube, etc.).
   - **Requests tab** — review submitted requests and update their status.
@@ -187,7 +191,9 @@ so no extra config is needed.
 ## Notes & next steps
 
 - Videos are capped at **200 MB** per upload (`server/routes/agents.js`).
-- For production: set a strong `JWT_SECRET`, change the admin password, and consider
-  serving the built frontend (`client/npm run build`) from Express or a CDN.
+- **Before hosting**, follow [docs/HOSTING.md](docs/HOSTING.md): set `NODE_ENV=production`,
+  a strong random `JWT_SECRET`, a strong admin password (`npm run set-admin`), lock
+  `CLIENT_ORIGIN`, and keep `ENABLE_DEMO_LOGINS` off. The server enforces these in production.
+- Manage accounts with `npm run set-admin` (create/reset admin) and `npm run db` (inspect the DB).
 - Email-on-request was intentionally left out per the chosen setup (requests are stored
   in the DB and reviewed in the admin console). SMTP can be added later in `routes/requests.js`.

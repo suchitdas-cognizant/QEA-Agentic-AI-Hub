@@ -88,6 +88,7 @@ export default function Hub() {
               <small>{role}</small>
             </span>
           </div>
+          {role === 'user' && <AccessIconButton />}
           <button className="hub-signout" onClick={() => { logout(); navigate('/'); }} type="button">
             Sign out
           </button>
@@ -120,7 +121,6 @@ export default function Hub() {
                 activeCount={activeCount}
                 onGo={go}
               />
-              {role === 'user' && <RequestAccessCard />}
             </>
           )}
 
@@ -159,65 +159,40 @@ export default function Hub() {
   );
 }
 
-function RequestAccessCard() {
-  const [state, setState] = useState('idle'); // idle | form | pending
-  const [message, setMessage] = useState('');
+// Compact associate-access control shown as a small icon in the user profile.
+function AccessIconButton() {
+  const [pending, setPending] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    api.myAccess().then((d) => { if (d.pending) setState('pending'); }).catch(() => {});
+    api.myAccess().then((d) => setPending(Boolean(d.pending))).catch(() => {});
   }, []);
 
-  const submit = async (e) => {
-    e.preventDefault();
+  const request = async () => {
+    if (pending || busy) return;
+    if (!window.confirm('Request associate access? An admin will review and approve it.')) return;
     setBusy(true);
-    setError('');
     try {
-      await api.requestAccess(message.trim());
-      setState('pending');
+      await api.requestAccess('');
+      setPending(true);
     } catch (err) {
-      setError(err.message || 'Could not submit request.');
+      alert(err.message || 'Could not submit request.');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <section className={`hub-access-card ${state === 'pending' ? 'is-pending' : ''}`}>
-      <div className="hub-access-icon" aria-hidden="true">{state === 'pending' ? '⏳' : '🛡️'}</div>
-      {state === 'pending' ? (
-        <div className="hub-access-body">
-          <b>Associate access requested</b>
-          <p>Your request is pending. An admin will review and approve it — you'll get associate access on your next sign-in once approved.</p>
-        </div>
-      ) : state === 'form' ? (
-        <form className="hub-access-body" onSubmit={submit}>
-          <b>Request associate access</b>
-          <p>Tell the admin why you need to review agent requests (optional).</p>
-          <textarea
-            className="input"
-            rows={2}
-            placeholder="e.g. I triage incoming agent requests for the Banking QA team."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-          {error && <span className="note err">{error}</span>}
-          <div className="hub-access-actions">
-            <button className="btn btn-primary btn-sm" disabled={busy} type="submit">
-              {busy ? 'Sending…' : 'Send request'}
-            </button>
-            <button className="btn btn-ghost btn-sm" type="button" onClick={() => setState('idle')}>Cancel</button>
-          </div>
-        </form>
-      ) : (
-        <div className="hub-access-body">
-          <b>Become an associate</b>
-          <p>Associates can review agent requests submitted across the platform. Request access and an admin will approve it.</p>
-          <button className="btn btn-primary btn-sm" type="button" onClick={() => setState('form')}>Request access</button>
-        </div>
-      )}
-    </section>
+    <button
+      className={`access-req-btn ${pending ? 'is-pending' : ''}`}
+      onClick={request}
+      disabled={pending || busy}
+      title={pending ? 'Pending admin approval' : 'Ask an admin for associate access to review agent requests'}
+      type="button"
+    >
+      <span aria-hidden="true">{pending ? '⏳' : '🛡'}</span>
+      {busy ? 'Sending…' : pending ? 'Access requested' : 'Request associate access'}
+    </button>
   );
 }
 
@@ -254,8 +229,8 @@ function RequestsInbox({ canDelete }) {
   return (
     <section className="hub-inbox">
       <div className="hub-panel-head">
-        <h2>Agent requests {rows.length > 0 && <span className="hub-count">{rows.length}</span>}</h2>
-        <p>Submissions from the request form. Review and move each through its status.</p>
+        <h2>Innovation ideas {rows.length > 0 && <span className="hub-count">{rows.length}</span>}</h2>
+        <p>Ideas an admin forwarded to you to build into agents. Review each and move it through its status.</p>
       </div>
 
       {loading ? (
@@ -263,7 +238,7 @@ function RequestsInbox({ canDelete }) {
       ) : error ? (
         <div className="empty">{error}</div>
       ) : rows.length === 0 ? (
-        <div className="empty">No requests submitted yet.</div>
+        <div className="empty">No ideas forwarded to you yet.</div>
       ) : (
         <div className="hub-table-wrap">
           <table className="table">

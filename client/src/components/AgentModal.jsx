@@ -152,9 +152,7 @@ export default function AgentModal({ agent, onClose, onRated }) {
         <p className="drawer-brand">Cognizant</p>
         <h2>{agent.name}</h2>
         <div className="drawer-meta">
-          <span className={`tier-badge tier-${(agent.tier || 'Free').toLowerCase()}`}>
-            {agent.tier === 'Premium' ? '★ Premium' : 'Free'}
-          </span>
+          {agent.tier === 'Premium' && <span className="tier-badge tier-premium">★ Premium</span>}
           <span className={`status-badge status-${(agent.status || 'Active').toLowerCase()}`}>
             <span className="status-dot" />
             {agent.status || 'Active'}

@@ -91,12 +91,15 @@ const ATTACH_ICON = { video: '🎬', md: '📄', code: '💻', other: '📎' };
 const roleLabel = (role) => ({ admin: 'Admin', associate: 'Associate', user: 'User' }[role] || 'User');
 
 // Focused, read + act view for a single request.
-function RequestDetail({ req, busy, evaluating, onClose, onStatus, onPublish, onEvaluate, onDelete }) {
+function RequestDetail({ req, busy, evaluating, associates = [], onClose, onStatus, onPublish, onEvaluate, onForward, onDelete }) {
   const [launchStatus, setLaunchStatus] = useState('Active');
   const [launchTier, setLaunchTier] = useState('Free');
+  const [fwd, setFwd] = useState('');
   useEffect(() => { if (req?.tier) setLaunchTier(req.tier); }, [req?._id, req?.tier]);
+  useEffect(() => { setFwd(req?.forwardedTo || ''); }, [req?._id, req?.forwardedTo]);
   if (!req) return null;
   const r = req;
+  const isIdea = r.type === 'idea';
   const ev = r.evaluation;
   const card = ev?.card || {};
   const failedGates = (card.hard_gates || []).filter((g) => g.status !== 'PASS');
@@ -166,7 +169,8 @@ function RequestDetail({ req, busy, evaluating, onClose, onStatus, onPublish, on
           <p className="sub">No extra detail provided — this is an innovation idea.</p>
         )}
 
-        {/* ---- Readiness evaluation (ARA) ---- */}
+        {/* ---- Readiness evaluation (ARA) — full submissions only; ideas are review-only ---- */}
+        {r.type !== 'idea' && (<>
         <div className="req-label">Readiness evaluation</div>
         {ev && card.verdict ? (
           <div className="eval-report">
@@ -271,6 +275,7 @@ function RequestDetail({ req, busy, evaluating, onClose, onStatus, onPublish, on
             {evaluating ? 'Evaluating…' : '▶ Send for evaluation'}
           </button>
         )}
+        </>)}
 
         <div className="req-modal-actions">
           <select
@@ -281,7 +286,29 @@ function RequestDetail({ req, busy, evaluating, onClose, onStatus, onPublish, on
           >
             {STATUSES.map((s) => <option key={s}>{s}</option>)}
           </select>
-          {r.publishedAgent ? (
+          {isIdea ? (
+            /* Innovation ideas are never published — they're forwarded to an associate to build out. */
+            <div className="req-publish-group">
+              <label className="req-publish-as">
+                Forward to
+                <select
+                  className="input"
+                  value={fwd}
+                  onChange={(e) => setFwd(e.target.value)}
+                  style={{ padding: '6px 10px', maxWidth: 220 }}
+                >
+                  <option value="">Select an associate…</option>
+                  {associates.map((a) => (
+                    <option key={a._id || a.email} value={a.email}>{a.name || a.email}</option>
+                  ))}
+                </select>
+              </label>
+              <button className="btn btn-primary btn-sm" disabled={!fwd || busy === r._id} onClick={() => onForward(r._id, fwd)}>
+                {busy === r._id ? 'Forwarding…' : (r.forwardedTo ? 'Update forward' : 'Forward to associate')}
+              </button>
+              {r.forwardedTo && <span className="note ok">→ Forwarded to {r.forwardedToName || r.forwardedTo}</span>}
+            </div>
+          ) : r.publishedAgent ? (
             <span className="note ok">✓ Published as a live agent</span>
           ) : (
             <div className="req-publish-group">
@@ -321,13 +348,18 @@ function RequestDetail({ req, busy, evaluating, onClose, onStatus, onPublish, on
 
 function RequestsTab() {
   const [rows, setRows] = useState([]);
+  const [associates, setAssociates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
   const [evaluating, setEvaluating] = useState(false);
   const [detailId, setDetailId] = useState(null);
+  const [tab, setTab] = useState('idea'); // 'idea' = innovation ideas, 'submission' = from associates
 
   // Deriving the open request from `rows` keeps the modal in sync after reloads.
   const detail = rows.find((r) => r._id === detailId) || null;
+  const ideas = rows.filter((r) => (r.type || 'submission') === 'idea');
+  const submissions = rows.filter((r) => (r.type || 'submission') !== 'idea');
+  const shown = tab === 'idea' ? ideas : submissions;
 
   const load = async () => {
     setLoading(true);
@@ -338,6 +370,19 @@ function RequestsTab() {
     }
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => { api.listAssociates().then(setAssociates).catch(() => {}); }, []);
+
+  const forward = async (id, associateEmail) => {
+    setBusy(id);
+    try {
+      await api.forwardRequest(id, associateEmail);
+      await load();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const setStatus = async (id, status) => {
     await api.updateRequestStatus(id, status);
@@ -376,13 +421,31 @@ function RequestsTab() {
   return (
     <div className="panel">
       <h3>Agent requests ({rows.length})</h3>
+      <div className="req-domains">
+        <button
+          className={`req-domain ${tab === 'idea' ? 'active' : ''}`}
+          onClick={() => setTab('idea')}
+          type="button"
+        >
+          💡 Innovation ideas <span className="req-domain-count">{ideas.length}</span>
+        </button>
+        <button
+          className={`req-domain ${tab === 'submission' ? 'active' : ''}`}
+          onClick={() => setTab('submission')}
+          type="button"
+        >
+          📦 From associates <span className="req-domain-count">{submissions.length}</span>
+        </button>
+      </div>
       {loading ? (
         <div className="loading">Loading…</div>
-      ) : rows.length === 0 ? (
-        <div className="empty">No requests submitted yet.</div>
+      ) : shown.length === 0 ? (
+        <div className="empty">
+          {tab === 'idea' ? 'No innovation ideas yet.' : 'No associate submissions yet.'}
+        </div>
       ) : (
         <div className="req-rows">
-          {rows.map((r) => (
+          {shown.map((r) => (
             <button className="req-row" key={r._id} onClick={() => setDetailId(r._id)}>
               <span className={`type-tag type-${r.type || 'submission'}`}>
                 {r.type === 'idea' ? '💡 Idea' : '📦 Full'}
@@ -404,10 +467,12 @@ function RequestsTab() {
         req={detail}
         busy={busy}
         evaluating={evaluating}
+        associates={associates}
         onClose={() => setDetailId(null)}
         onStatus={setStatus}
         onPublish={publish}
         onEvaluate={evaluate}
+        onForward={forward}
         onDelete={remove}
       />
     </div>
@@ -415,36 +480,13 @@ function RequestsTab() {
 }
 
 /* ---------------- Benchmarking tab (AgentBench integration) ---------------- */
+// AgentBench is built into the hub and served same-origin at /benchmark/ — no
+// separate app or hosting required. Rebuild with build-agentbench.ps1 after a sync.
+const AGENTBENCH_URL = '/benchmark/index.html';
 const AGENTBENCH_REPO = 'https://github.com/mprangshu/AgentBench.git';
 
 function BenchmarkTab() {
-  const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [reachable, setReachable] = useState(null); // null = checking, true/false
-
-  useEffect(() => {
-    let alive = true;
-    api.getConfig()
-      .then((c) => { if (alive) setUrl(c.benchmarkUrl || ''); })
-      .catch(() => {})
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, []);
-
-  // Probe whether the AgentBench app is actually up (no-cors ping).
-  useEffect(() => {
-    if (!url) return;
-    let alive = true;
-    setReachable(null);
-    fetch(url, { mode: 'no-cors' })
-      .then(() => { if (alive) setReachable(true); })
-      .catch(() => { if (alive) setReachable(false); });
-    return () => { alive = false; };
-  }, [url]);
-
-  const open = () => url && window.open(url, '_blank', 'noopener,noreferrer');
-
-  if (loading) return <div className="panel"><div className="loading">Loading…</div></div>;
+  const open = () => window.open(AGENTBENCH_URL, '_blank', 'noopener,noreferrer');
 
   return (
     <div className="panel bench-panel">
@@ -452,49 +494,21 @@ function BenchmarkTab() {
         <div>
           <h3 style={{ margin: 0 }}>AgentBench — benchmarking</h3>
           <p className="sub" style={{ margin: '4px 0 0' }}>
-            Run standardized benchmarks and scoring for agents. Served by the integrated
-            AgentBench app; changes your teammate pushes sync into the hub.
+            Compare agents and models on quality, cost and latency. Built into the hub —
+            rebuild from the AgentBench repo when your teammate ships changes.
           </p>
         </div>
         <div className="bench-actions">
-          <button className="btn btn-primary btn-sm" onClick={open} disabled={!url}>
-            ↗ Open AgentBench
-          </button>
+          <button className="btn btn-primary btn-sm" onClick={open}>↗ Open in new tab</button>
           <a className="btn btn-ghost btn-sm" href={AGENTBENCH_REPO} target="_blank" rel="noreferrer">
             ⧉ Repository
           </a>
         </div>
       </div>
 
-      <div className="bench-status">
-        <span className={`bench-dot ${reachable === true ? 'up' : reachable === false ? 'down' : 'wait'}`} />
-        {reachable === true && <>Service is up at <code>{url}</code></>}
-        {reachable === false && <>Not reachable at <code>{url}</code> — start the AgentBench app, then reload.</>}
-        {reachable === null && <>Checking <code>{url}</code>…</>}
+      <div className="bench-frame">
+        <iframe src={AGENTBENCH_URL} title="AgentBench" allow="clipboard-write" />
       </div>
-
-      {reachable === true ? (
-        <div className="bench-frame">
-          <iframe src={url} title="AgentBench" allow="clipboard-write" />
-        </div>
-      ) : (
-        <div className="bench-empty">
-          <div className="bench-empty-icon">📊</div>
-          <b>AgentBench isn’t running yet</b>
-          <p>
-            The benchmarking app is integrated as a submodule at <code>integrations/agentbench</code>.
-            Once it’s started it will appear here, or you can open it in a new tab.
-          </p>
-          <div className="bench-actions">
-            <button className="btn btn-primary btn-sm" onClick={open} disabled={!url}>↗ Open AgentBench</button>
-            <a className="btn btn-ghost btn-sm" href={AGENTBENCH_REPO} target="_blank" rel="noreferrer">⧉ View repository</a>
-          </div>
-          <p className="bench-hint">
-            To sync your teammate’s latest changes, run <code>sync-agents.ps1</code> — it pulls the
-            AgentBench submodule and restarts the services.
-          </p>
-        </div>
-      )}
     </div>
   );
 }

@@ -1399,6 +1399,18 @@ a:hover { text-decoration: underline; }
 .hub-user-meta { display: flex; flex-direction: column; line-height: 1.25; overflow: hidden; }
 .hub-user-meta b { color: #fff; font-size: 0.86rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hub-user-meta small { color: #97a3bd; font-size: 0.74rem; text-transform: capitalize; }
+/* Slim labeled "request associate access" button in the user profile */
+.access-req-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%; margin: 8px 0;
+  padding: 8px 12px; border-radius: 8px; font: inherit; font-size: 0.8rem; font-weight: 600;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #dbe3f4; cursor: pointer; text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.access-req-btn span { font-size: 0.95rem; }
+.access-req-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.3); }
+.access-req-btn.is-pending { opacity: 0.75; cursor: default; }
+.access-req-btn:disabled { cursor: default; }
 .hub-signout { width: 100%; padding: 9px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 9px; background: transparent; color: #cdd4e6; font: inherit; font-size: 0.84rem; font-weight: 600; cursor: pointer; transition: background 0.15s ease; }
 .hub-signout:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 
@@ -1541,6 +1553,20 @@ button.hub-stat:hover { border-color: var(--cz-blue-ring); box-shadow: var(--cz-
 .role-admin { background: #fff4e0; color: #9a6200; }
 
 /* Clickable request rows (admin approvals) */
+/* Two-domain segmented control: innovation ideas vs associate submissions */
+.req-domains { display: flex; gap: 8px; margin: 4px 0 18px; border-bottom: 1px solid var(--cz-line, #e6e9ef); }
+.req-domain {
+  display: inline-flex; align-items: center; gap: 8px; font: inherit; font-weight: 600; font-size: 0.9rem;
+  color: var(--cz-muted, #6b7280); background: none; border: none; cursor: pointer;
+  padding: 10px 4px; margin-bottom: -1px; border-bottom: 2px solid transparent;
+}
+.req-domain:hover { color: var(--cz-ink, #0d1321); }
+.req-domain.active { color: var(--cz-blue, #1668e3); border-bottom-color: var(--cz-blue, #1668e3); }
+.req-domain-count {
+  font-size: 0.72rem; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+  background: var(--cz-bg-sunken, #f1f3f5); color: var(--cz-muted, #6b7280);
+}
+.req-domain.active .req-domain-count { background: var(--cz-blue-soft, #e8f0fd); color: var(--cz-blue-dark, #0f4fb5); }
 .req-rows { display: grid; gap: 10px; }
 .req-row {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer;

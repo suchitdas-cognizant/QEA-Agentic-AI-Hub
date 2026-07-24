@@ -81,6 +81,8 @@ export const api = {
     request(`/requests/${id}/publish`, { method: 'POST', body: { status, tier }, auth: true }),
   evaluateRequest: (id) =>
     request('/evaluation/run', { method: 'POST', body: { requestId: id }, auth: true }),
+  forwardRequest: (id, associateEmail) =>
+    request(`/requests/${id}/forward`, { method: 'POST', body: { associateEmail }, auth: true }),
   deleteRequest: (id) => request(`/requests/${id}`, { method: 'DELETE', auth: true }),
 
   // access / associate management

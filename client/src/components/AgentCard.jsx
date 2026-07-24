@@ -30,9 +30,7 @@ export default function AgentCard({ agent, onOpen, index = 0 }) {
           {agent.icon || '🤖'}
         </span>
         <span className="card-badges">
-          <span className={`tier-badge tier-${tier.toLowerCase()}`}>
-            {tier === 'Premium' ? '★ Premium' : 'Free'}
-          </span>
+          {tier === 'Premium' && <span className="tier-badge tier-premium">★ Premium</span>}
           <span className={`status-badge status-${status.toLowerCase()}`}>
             <span className="status-dot" />
             {status}

@@ -11,29 +11,6 @@ const VALID_ROLES = ['user', 'admin'];
 
 const normalizeLogin = (value = '') => value.trim().toLowerCase();
 
-// Built-in demo logins. These are a convenience for local demos ONLY and are
-// DISABLED unless ENABLE_DEMO_LOGINS=true, so they can never be a backdoor in a
-// hosted deployment. Real users self-register; the admin lives in the database.
-function localDirectoryAccounts() {
-  if (process.env.ENABLE_DEMO_LOGINS !== 'true') return [];
-  return [
-    {
-      username: process.env.USER_USERNAME || 'user@cognizant.com',
-      password: process.env.USER_PASSWORD || 'user123',
-      role: 'user',
-      displayName: 'QEA User',
-      aliases: ['user'],
-    },
-    {
-      username: process.env.ASSOCIATE_USERNAME || 'associate@cognizant.com',
-      password: process.env.ASSOCIATE_PASSWORD || 'associate123',
-      role: 'user',
-      displayName: 'QEA Team Member',
-      aliases: ['associate'],
-    },
-  ];
-}
-
 function signPortalToken(account) {
   return jwt.sign(
     {
@@ -87,25 +64,7 @@ router.post('/login', async (req, res) => {
     }
   }
 
-  const directoryAccount = localDirectoryAccounts().find((account) => {
-    const names = [account.username, ...(account.aliases || [])].map(normalizeLogin);
-    return (!requestedRole || account.role === requestedRole) && names.includes(loginId) && account.password === password;
-  });
-
-  if (!directoryAccount) {
-    return res.status(401).json({ error: 'Invalid credentials for the selected access level.' });
-  }
-
-  // Upgrade to associate when this email has been granted access.
-  const grant = await Associate.findOne({ email: normalizeLogin(directoryAccount.username) });
-
-  const account = {
-    username: directoryAccount.username,
-    role: grant ? 'associate' : 'user',
-    displayName: directoryAccount.displayName,
-  };
-
-  res.json({ token: signPortalToken(account), ...account });
+  return res.status(401).json({ error: 'Invalid credentials for the selected access level.' });
 });
 
 // POST /api/auth/register  -> create a self-service user account and sign them in.
@@ -123,16 +82,12 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 6 characters.' });
   }
 
-  // Reject if the email is already taken by an admin, a registered user, or a
-  // built-in directory account.
-  const directoryTaken = localDirectoryAccounts().some((a) =>
-    [a.username, ...(a.aliases || [])].map(normalizeLogin).includes(em)
-  );
+  // Reject if the email is already taken by an admin or a registered user.
   const [adminTaken, userTaken] = await Promise.all([
     Admin.findOne({ username: em }),
     User.findOne({ email: em }),
   ]);
-  if (adminTaken || userTaken || directoryTaken) {
+  if (adminTaken || userTaken) {
     return res.status(409).json({ error: 'An account with this email already exists.' });
   }
 

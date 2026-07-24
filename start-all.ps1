@@ -40,16 +40,19 @@ else {
   if (Wait-Port 5173 30) { Write-Host "Hub frontend : started (5173)" } else { Write-Host "Hub frontend : starting… (5173)" }
 }
 
-# 5) AgentBench (benchmarking) frontend
-if (Test-Port 5199) { Write-Host "AgentBench   : already running (5199)" }
-else {
-  $benchStart = Join-Path $root "start-agentbench.ps1"
-  if (Test-Path $benchStart) {
-    & powershell -ExecutionPolicy Bypass -File $benchStart | Out-Null
-    if (Wait-Port 5199 40) { Write-Host "AgentBench   : started (5199)" } else { Write-Host "AgentBench   : starting… (5199)" }
-  } else { Write-Host "AgentBench   : start-agentbench.ps1 not found (skipped)" }
+# 5) AgentBench (benchmarking) is built into the hub and served at /benchmark/.
+#    Build it once if the bundle isn't present yet.
+if (Test-Path (Join-Path $root "client\public\benchmark\index.html")) {
+  Write-Host "AgentBench   : bundled (served at /benchmark/)"
+} else {
+  $benchBuild = Join-Path $root "build-agentbench.ps1"
+  if (Test-Path $benchBuild) {
+    Write-Host "AgentBench   : building into the hub…"
+    & powershell -ExecutionPolicy Bypass -File $benchBuild | Out-Null
+    Write-Host "AgentBench   : built (served at /benchmark/)"
+  } else { Write-Host "AgentBench   : build script not found (skipped)" }
 }
 
 Write-Host ""
 Write-Host "QEA Agentic Hub is up  ->  http://localhost:5173"
-Write-Host "AgentBench (benchmarking) ->  http://localhost:5199"
+Write-Host "Benchmarking is in the admin console (served at /benchmark/)."
