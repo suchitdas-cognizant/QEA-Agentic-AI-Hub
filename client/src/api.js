@@ -58,7 +58,7 @@ export const api = {
   getAgent: (id) => request(`/agents/${id}`),
   getFeedback: (id) => request(`/agents/${id}/feedback`),
   submitFeedback: (id, body) =>
-    request(`/agents/${id}/feedback`, { method: 'POST', body }),
+    request(`/agents/${id}/feedback`, { method: 'POST', body, auth: true }),
   submitRequest: (formData) =>
     request('/requests', { method: 'POST', body: formData, auth: true, isForm: true }),
   askAssistant: (message) => request('/assistant', { method: 'POST', body: { message } }),

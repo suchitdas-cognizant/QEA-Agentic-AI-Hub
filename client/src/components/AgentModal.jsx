@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, videoUrl } from '../api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 // Convert well-known video URLs into an embeddable form. Returns null when the
 // link can't be safely iframed (most sites block it via X-Frame-Options) — the
@@ -101,6 +102,8 @@ function formatDate(d) {
 }
 
 export default function AgentModal({ agent, onClose, onRated }) {
+  const { role } = useAuth();
+  const canReview = role === 'admin' || role === 'associate';
   const [feedback, setFeedback] = useState([]);
   const [avg, setAvg] = useState({ rating: agent.rating || 0, count: agent.ratingCount || 0 });
   const [form, setForm] = useState({ rating: 0, name: '', comment: '' });
@@ -243,30 +246,32 @@ export default function AgentModal({ agent, onClose, onRated }) {
           </div>
         </div>
 
-        <form className="feedback-form" onSubmit={submit}>
-          <span className="fb-label">Your rating</span>
-          <Stars value={form.rating} onChange={(n) => setForm((f) => ({ ...f, rating: n }))} />
-          <input
-            className="input"
-            placeholder="Your name (optional)"
-            value={form.name}
-            maxLength={80}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-          />
-          <textarea
-            className="textarea"
-            placeholder="Share your experience with this agent…"
-            value={form.comment}
-            maxLength={1000}
-            onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
-          />
-          <div className="fb-actions">
-            <button className="btn btn-primary btn-sm" disabled={submitting}>
-              {submitting ? 'Submitting…' : 'Submit feedback'}
-            </button>
-            {msg.text && <span className={`note ${msg.type}`}>{msg.text}</span>}
-          </div>
-        </form>
+        {canReview && (
+          <form className="feedback-form" onSubmit={submit}>
+            <span className="fb-label">Your rating</span>
+            <Stars value={form.rating} onChange={(n) => setForm((f) => ({ ...f, rating: n }))} />
+            <input
+              className="input"
+              placeholder="Your name (optional)"
+              value={form.name}
+              maxLength={80}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            />
+            <textarea
+              className="textarea"
+              placeholder="Share your experience with this agent…"
+              value={form.comment}
+              maxLength={1000}
+              onChange={(e) => setForm((f) => ({ ...f, comment: e.target.value }))}
+            />
+            <div className="fb-actions">
+              <button className="btn btn-primary btn-sm" disabled={submitting}>
+                {submitting ? 'Submitting…' : 'Submit feedback'}
+              </button>
+              {msg.text && <span className={`note ${msg.type}`}>{msg.text}</span>}
+            </div>
+          </form>
+        )}
 
         {feedback.length > 0 && (
           <ul className="feedback-list">

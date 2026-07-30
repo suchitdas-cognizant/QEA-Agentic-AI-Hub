@@ -9,6 +9,9 @@ export default function AgentCard({ agent, onOpen, index = 0 }) {
   const status = agent.status || 'Active';
   const auto = agent.autonomyLevel;
   const tier = agent.tier || 'Free';
+  const rating = Number(agent.rating) || 0;
+  const ratingCount = Number(agent.ratingCount) || 0;
+  const techs = Array.isArray(agent.techStacks) ? agent.techStacks.filter(Boolean) : [];
 
   return (
     <article
@@ -39,31 +42,48 @@ export default function AgentCard({ agent, onOpen, index = 0 }) {
       </div>
 
       <h3 className="card-title">{agent.name}</h3>
-      <p className="card-tagline">{agent.tagline}</p>
+      <p className="card-tagline">{agent.tagline || 'No description provided yet.'}</p>
 
-      {auto && (
+      {(auto || techs.length > 0) && (
         <div className="card-meta">
-          <span className={`autonomy-chip autonomy-${auto.toLowerCase()}`} title="Autonomy level (ARA)">
-            <span className="autonomy-level">{auto}</span>
-            {AUTONOMY_LABEL[auto] || 'Autonomy'}
-          </span>
+          {auto && (
+            <span className={`autonomy-chip autonomy-${auto.toLowerCase()}`} title="Autonomy level (ARA)">
+              <span className="autonomy-level">{auto}</span>
+              {AUTONOMY_LABEL[auto] || 'Autonomy'}
+            </span>
+          )}
+          {techs.slice(0, 3).map((t) => (
+            <span className="card-tech" key={t}>{t}</span>
+          ))}
+          {techs.length > 3 && <span className="card-tech card-tech-more">+{techs.length - 3}</span>}
         </div>
       )}
 
       <div className="card-foot">
-        {agent.industry ? <span className="card-industry">{agent.industry}</span> : <span />}
+        <span className="card-rating" aria-label={ratingCount ? `Rated ${rating.toFixed(1)} out of 5` : 'No reviews yet'}>
+          {ratingCount > 0 ? (
+            <>
+              <span className="card-rating-star">★</span>
+              <b>{rating.toFixed(1)}</b>
+              <em>({ratingCount})</em>
+            </>
+          ) : (
+            <span className="card-rating-none">No reviews yet</span>
+          )}
+        </span>
+
         {agent.smeEmail ? (
           <a
             className="connect-sme"
-            href={`mailto:${agent.smeEmail}?subject=${encodeURIComponent(
-              `Connect SME — ${agent.name}`
-            )}`}
+            href={`mailto:${agent.smeEmail}?subject=${encodeURIComponent(`Connect SME — ${agent.name}`)}`}
             onClick={(e) => e.stopPropagation()}
           >
             ✉ Connect SME
           </a>
+        ) : agent.industry ? (
+          <span className="card-industry">{agent.industry}</span>
         ) : (
-          <span className="connect-sme">✉ Connect SME</span>
+          <span className="card-open">View →</span>
         )}
       </div>
     </article>

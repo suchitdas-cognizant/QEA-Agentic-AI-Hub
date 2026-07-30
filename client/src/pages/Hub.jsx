@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -160,39 +161,89 @@ export default function Hub() {
 }
 
 // Compact associate-access control shown as a small icon in the user profile.
+// Clicking it opens a popup where a note is required before sending.
 function AccessIconButton() {
   const [pending, setPending] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     api.myAccess().then((d) => setPending(Boolean(d.pending))).catch(() => {});
   }, []);
 
-  const request = async () => {
-    if (pending || busy) return;
-    if (!window.confirm('Request associate access? An admin will review and approve it.')) return;
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!note.trim()) {
+      setError('Please add a note explaining why you need associate access.');
+      return;
+    }
     setBusy(true);
+    setError('');
     try {
-      await api.requestAccess('');
+      await api.requestAccess(note.trim());
       setPending(true);
+      setOpen(false);
+      setNote('');
     } catch (err) {
-      alert(err.message || 'Could not submit request.');
+      setError(err.message || 'Could not submit request.');
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <button
-      className={`access-req-btn ${pending ? 'is-pending' : ''}`}
-      onClick={request}
-      disabled={pending || busy}
-      title={pending ? 'Pending admin approval' : 'Ask an admin for associate access to review agent requests'}
-      type="button"
-    >
-      <span aria-hidden="true">{pending ? '⏳' : '🛡'}</span>
-      {busy ? 'Sending…' : pending ? 'Access requested' : 'Request associate access'}
-    </button>
+    <>
+      <button
+        className={`access-req-btn ${pending ? 'is-pending' : ''}`}
+        onClick={() => !pending && setOpen(true)}
+        disabled={pending}
+        title={pending ? 'Pending admin approval' : 'Ask an admin for associate access to review agent requests'}
+        type="button"
+      >
+        <span aria-hidden="true">{pending ? '⏳' : '🛡'}</span>
+        {pending ? 'Access requested' : 'Request associate access'}
+      </button>
+
+      {open && createPortal(
+        <div className="req-modal-overlay" onClick={() => setOpen(false)}>
+          <form className="access-modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+            <button className="req-modal-close" type="button" aria-label="Close" onClick={() => setOpen(false)}>×</button>
+            <div className="access-modal-head">
+              <span className="access-modal-icon" aria-hidden="true">🛡</span>
+              <div>
+                <h3>Request associate access</h3>
+                <p className="sub">Associates can review and build out agent ideas.</p>
+              </div>
+            </div>
+            <div className="access-modal-field">
+              <label className="fb-label" htmlFor="access-note">Note <span className="req-star">*</span></label>
+              <textarea
+                id="access-note"
+                className="textarea"
+                rows={4}
+                autoFocus
+                value={note}
+                maxLength={500}
+                onChange={(e) => setNote(e.target.value)}
+              />
+              <div className="access-modal-hint">
+                <span>{error ? <span className="note err">{error}</span> : 'Required — an admin will read this.'}</span>
+                <span className="access-modal-count">{note.length}/500</span>
+              </div>
+            </div>
+            <div className="access-modal-actions">
+              <button className="btn btn-ghost btn-sm" type="button" onClick={() => setOpen(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" type="submit" disabled={busy || !note.trim()}>
+                {busy ? 'Sending…' : 'Send request'}
+              </button>
+            </div>
+          </form>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 

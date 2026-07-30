@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import multer from 'multer';
 import Agent from '../models/Agent.js';
 import Feedback from '../models/Feedback.js';
-import { requireAdmin } from '../middleware/auth.js';
+import { requireAdmin, requireStaff } from '../middleware/auth.js';
 import { uploadBuffer, deleteFile } from '../utils/gridfs.js';
 
 const router = express.Router();
@@ -166,9 +166,10 @@ router.get('/:id/feedback', async (req, res) => {
   res.json(items);
 });
 
-// POST /api/agents/:id/feedback  (public) — submit a star rating + optional comment.
+// POST /api/agents/:id/feedback  (staff only) — submit a star rating + optional comment.
+// Only associates and admins can review; users can only read reviews.
 // Stores the feedback and recomputes the agent's average rating from all feedback.
-router.post('/:id/feedback', async (req, res) => {
+router.post('/:id/feedback', requireStaff, async (req, res) => {
   const rating = Number(req.body?.rating);
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
     return res.status(400).json({ error: 'Please select a rating between 1 and 5 stars.' });
